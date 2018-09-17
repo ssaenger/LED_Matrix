@@ -1,6 +1,6 @@
-//Byte val 2PI Cosine Wave, offset by 1 PI 
+//Byte val 2PI Cosine Wave, offset by 1 PI
 //supports fast trig calcs and smooth LED fading/pulsing.
-uint8_t const cos_wave[256] PROGMEM =  
+uint8_t cos_wave[256] PROGMEM =
 {0,0,0,0,1,1,1,2,2,3,4,5,6,6,8,9,10,11,12,14,15,17,18,20,22,23,25,27,29,31,33,35,38,40,42,
 45,47,49,52,54,57,60,62,65,68,71,73,76,79,82,85,88,91,94,97,100,103,106,109,113,116,119,
 122,125,128,131,135,138,141,144,147,150,153,156,159,162,165,168,171,174,177,180,183,186,
@@ -15,7 +15,7 @@ uint8_t const cos_wave[256] PROGMEM =
 
 
 //Gamma Correction Curve
-uint8_t const exp_gamma[256] PROGMEM =
+uint8_t exp_gamma[256] PROGMEM =
 {0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,3,3,3,3,3,
 4,4,4,4,4,5,5,5,5,5,6,6,6,7,7,7,7,8,8,8,9,9,9,10,10,10,11,11,12,12,12,13,13,14,14,14,15,15,
 16,16,17,17,18,18,19,19,20,20,21,21,22,23,23,24,24,25,26,26,27,28,28,29,30,30,31,32,32,33,
@@ -26,3 +26,10 @@ uint8_t const exp_gamma[256] PROGMEM =
 177,179,181,183,185,187,190,192,194,196,198,200,202,204,207,209,211,213,216,218,220,222,225,
 227,229,232,234,236,239,241,244,246,249,251,253,254,255
 };
+
+inline uint8_t fastCosineCalc( uint16_t preWrapVal)
+{
+  uint8_t wrapVal = (preWrapVal % 255);
+  if (wrapVal<0) wrapVal=255+wrapVal;
+  return (pgm_read_byte_near(cos_wave+wrapVal));
+}

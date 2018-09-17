@@ -5,7 +5,7 @@
 // You can also use Jinx to record Glediator format data to a SD card.
 // To play the data from your SD card, use this modified program:
 // https://forum.pjrc.com/threads/46229&viewfull=1#post153927
-
+/*
 #include <OctoWS2811.h>
 
 const int ledsPerStrip = 360;
@@ -23,7 +23,7 @@ const int config = WS2811_GRB | WS2811_800kHz;
 OctoWS2811 leds(ledsPerStrip, displayMemory, drawingMemory, config);
 
 void setup() {
-  Serial.begin(1000000);  
+  Serial.begin(1000000);
   leds.begin();
   leds.show();
 }
@@ -51,14 +51,14 @@ void loop() {
   while (serialGlediator() != 1) {}
   for (x = 0; x < WIDTH * 2; x++) {
     for (y = 0; y < HEIGHT; y++) {
-      if (x & 1) { 
+      if (x & 1) {
         while (!Serial.available()) ;
         Serial.read();
         while (!Serial.available()) ;
         Serial.read();
         while (!Serial.available()) ;
         Serial.read();
-        continue; 
+        continue;
       }
       b = serialGlediator();
       r = serialGlediator();
@@ -66,7 +66,7 @@ void loop() {
       leds.setPixel(xy(x/2,y), Color(r,g,b));
   }
 }
-  
+  */
 /*
   for (i = 0; i < WIDTH * HEIGHT * 2; i++) {
     if (i & 1 && i != WIDTH) { continue; }
@@ -84,9 +84,10 @@ void loop() {
         x = 0;
       }
   }
-  */
+
   leds.show();
 }
+*/
 /* Helper functions */
 // Create a 24 bit color value from R,G,B
 unsigned int Color(byte r, byte g, byte b)
