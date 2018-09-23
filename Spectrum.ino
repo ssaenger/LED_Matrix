@@ -1,5 +1,11 @@
+
+// While I may want to play around with the width to turn on LEDs in,
+// this constant will never change, since my LED matrix's width will
+// never change.
+#define LED_FIXED_WIDTH 47
+
 // Covers whole spectrum
-static uint32_t FreqBins1[WIDTH] = {
+static uint32_t FreqBins1[LED_FIXED_WIDTH] = {
    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
    2,  2,  2,  2,  2,  2,  2,  2,  3,  3,
    3,  3,  4,  4,  4,  4,  5,  5,  5,  5,
@@ -8,7 +14,7 @@ static uint32_t FreqBins1[WIDTH] = {
 };
 
 // Concerned with lower frequencies
-static uint32_t FreqBins2[WIDTH] = {
+static uint32_t FreqBins2[LED_FIXED_WIDTH] = {
    1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
    2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
    3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
