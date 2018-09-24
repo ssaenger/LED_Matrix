@@ -29,7 +29,7 @@
 // The difference between one color to the next. The higher the value,
 // the more the colors "blend" into eachother.
 // Value should only be 180 or 360
-#define COLOR_GRADIENT 180
+#define COLOR_GRADIENT 360
 // Saturation of the color. Sets the intensity of the color.
 // Value should be between 0-100
 // 100 = vivid colors, 0 = darker colors

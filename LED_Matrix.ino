@@ -32,12 +32,7 @@ uint32_t drawingMemory[LEDS_PER_PIN*6];
 const uint32_t config = WS2811_GRB | WS2811_800kHz;
 OctoWS2811 leds(LEDS_PER_PIN, displayMemory, drawingMemory, config);
 //------------------------------------------------------------------------------
-//5: 0.09458
-//4: 0.08915
-//3: 0.08372
-//2: 0.07830
-//1: 0.07289
-//0: 0.06748
+
 //------------------------------------------------------------------------------
 // Size of my matrix
 #define WIDTH  47
@@ -46,6 +41,9 @@ OctoWS2811 leds(LEDS_PER_PIN, displayMemory, drawingMemory, config);
 
 //------------------------------------------------------------------------------
 // Globals
+
+// Color pointer
+uint32_t* curColor;
 
 // Holds the RGB values filled up by a call to makeColor()
 // Don't change this value unless you modify makeColor()
@@ -111,6 +109,7 @@ void setup()
   fft.windowFunction(AudioWindowWelch1024);
   // Fill out rainbowColors[]
   color_HSLtoRGB(SATURATION, LIGHTNESS, rainbowColors);
+  curColor = rainbowColors;
 
   // Compute the vertical threshold
   computeVerticalLevels();
@@ -118,14 +117,15 @@ void setup()
   freqBins1 = spectrum_getBin1();
   freqBins2 = spectrum_getBin2();
 
-  state = fft_mid_st;
+  state = fft_btb_st;
   leds.begin();
+  //testAll();
 
 }
 
 void loop()
 {
-  static uint32_t frameCount = 25500;
+  static uint32_t frameCount = 0;
   static float    level;
   static uint32_t color;
   static uint16_t t, t2, t3;
@@ -227,44 +227,49 @@ void loop()
 
     case fft_mid_st:
       off();
-      for (x = 0; x < WIDTH; x++) {
-        leds.setPixel(map_xy_midBot(x, 0, HEIGHT / 2), 0x103000);
-        leds.setPixel(map_xy_midTop(x, 0, HEIGHT / 2), 0x103000);
-      }
       leds.show();
 
       while (1) {
         if (fft.available()) {
           freqBin = 0;
+          frameCount++;
+
           for (x = 0; x < WIDTH; x++) {
             level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
             for (y = 0; y < HEIGHT / 2 - 1; y++) {
-              if (level >= thresholdVertical[(y * 2) + 1]) {
-                leds.setPixel(map_xy_midBot(x, y, HEIGHT / 2 + 1), 0x103000);
-                leds.setPixel(map_xy_midTop(x, y, HEIGHT / 2 + 1), 0x103000);
+              if (level >= thresholdVertical[(y * 2) + 1] + (freqBins2[x] * thresholdVertical[0])) {
+                leds.setPixel(map_xy_midBot(x, y, HEIGHT / 2 + 1),
+                              curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
+                leds.setPixel(map_xy_midTop(x, y, HEIGHT / 2 + 1),
+                              curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
               }
               else {
                 leds.setPixel(map_xy_midBot(x, y, HEIGHT / 2 + 1), BLACK);
                 leds.setPixel(map_xy_midTop(x, y, HEIGHT / 2 + 1), BLACK);
               }
             }
+            // Fixed, center LEDs
+            leds.setPixel(map_xy_midBot(x, 0, HEIGHT / 2),
+                          curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
+            leds.setPixel(map_xy_midTop(x, 0, HEIGHT / 2),
+                          curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
             freqBin = freqBin + freqBins2[x];
           }
+          leds.show();
         }
-        leds.show();
       }
       break;
 
     case rainbow_st:
       break;
     case plaz_st:
-      frameCount++ ;
+      frameCount++;
       Serial.println(frameCount);
       t  = fastCosineCalc((30 * frameCount)/100); // time displacement
       t2 = fastCosineCalc((20 * frameCount)/100); // fiddle with these
       t3 = fastCosineCalc((45 * frameCount)/100); // to change looks
 
-      for (x = 0; x < WIDTH; x++) {
+      for (x = 0; x < WIDTH - 10; x++) {
         for (y = 0; y < HEIGHT ; y++) {
           //Calculate 3 seperate plasma waves, one for each color channel
           r = fastCosineCalc(((x << 3) +
@@ -320,4 +325,21 @@ void off() {
     }
   }
   leds.show();
+}
+
+
+void testAll() {
+  uint8_t x, y;
+  for (x = 0; x < WIDTH; x++) {
+    for (y = 0; y < HEIGHT ; y++) {
+      leds.setPixel(map_xy_bot(x, y), WHITE);
+      leds.show();
+      delay(5);
+    }
+    delay(10);
+    for (y = 0; y < HEIGHT ; y++) {
+      leds.setPixel(map_xy_bot(x, y), BLACK);
+    }
+    leds.show();
+  }
 }
