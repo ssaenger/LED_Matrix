@@ -55,18 +55,21 @@ uint32_t rainbowColors[COLOR_GRADIENT];
 // vertical pixel to turn on.  Computed in setup() using
 // the 3 parameters above.
 float thresholdVertical[HEIGHT];
+float thresholdHorizontal[WIDTH];
 
 // Spectrum arrays
 uint32_t* freqBins1;
 uint32_t* freqBins2;
+uint32_t* freqBins3;
 
 
-
-#define NUM_STATES 7 // Make sure to update this if adding/removing states
+#define NUM_STATES 9 // Make sure to update this if adding/removing states
 enum sm_states { fft_bot_st,   // shoot up from bottom
                  fft_top_st,   // shoot down from top
                  fft_btb_st,   // shoot from Both Top and Bottom
                  fft_mid_st,   // shoot from middle
+                 fft_side_st,  // shoot from sides
+                 fft_sideF_st, // shoot from sides, flipped
                  rainbow_st,   // display the rainbow
                  plaz_st,      // display neat math rainbow
                  //glediator_st, // Use the glediator software on PC
@@ -85,6 +88,7 @@ void color_HSLtoRGB(uint32_t  saturation,
                     uint32_t* rainbowColors);
 uint32_t* spectrum_getBin1();
 uint32_t* spectrum_getBin2();
+uint32_t* spectrum_getBin3();
 //uint32_t map_xy(uint32_t x, uint32_t y);
 void init_gridState(uint8_t LED_state);
 void computeVerticalLevels();
@@ -108,6 +112,17 @@ void off();
 #define map_xy_midBot(x,y,o) (x & 1) ? ((x * HEIGHT) + y + o) : \
                                        ((x * HEIGHT) + HEIGHT - 1 - (y + o))
 
+// sides
+#define map_xy_sidL(x,y)   (x & 1) ? ((x * HEIGHT) + HEIGHT - 1 - y) : \
+                                     ((x * HEIGHT) + y)
+
+#define map_xy_sidR(x,y)   (x & 1) ? (((WIDTH - x) * HEIGHT) - 1 - y) : \
+                                     (((WIDTH - x) * HEIGHT) - HEIGHT + y)
+// reversed top right side
+#define map_xy_sidR_F(x,y)   (x & 1) ? (((WIDTH - 1 - x) * HEIGHT) + y) : \
+                                    (((WIDTH - x) * HEIGHT) - 1 - y)
+
+
 //------------------------------------------------------------------------------
 
 void setup()
@@ -126,8 +141,9 @@ void setup()
 
   freqBins1 = spectrum_getBin1();
   freqBins2 = spectrum_getBin2();
+  freqBins3 = spectrum_getBin3();
 
-  LED_state = fft_bot_st;
+  LED_state = fft_side_st;
   leds.begin();
   //testAll();
 
@@ -139,7 +155,7 @@ void loop()
   static float    level;
   static uint16_t t, t2, t3;
   static int8_t   x, y;
-  static uint8_t  freqBin;
+  static uint16_t  freqBin;
   static uint8_t  r, g, b;
 
   init_gridState(LED_state);
@@ -241,6 +257,49 @@ void loop()
         }
       }
       break;
+    case fft_side_st:
+      while (isr_flag) {
+        if (fft.available()) {
+          freqBin = 0;
+          for (y = 0; y < HEIGHT; y++) {
+            level = fft.read(freqBin, freqBin + freqBins3[y] - 1);
+              for (x = 1; x < WIDTH / 2; x++) {
+              if (level >= thresholdHorizontal[(x * 2) + 1]) {
+                leds.setPixel(map_xy_sidL(x, y), rainbowColors[y*6]);
+                leds.setPixel(map_xy_sidR(x, y), rainbowColors[y*6]);
+              } else {
+                leds.setPixel(map_xy_sidL(x, y), BLACK);
+                leds.setPixel(map_xy_sidR(x, y), BLACK);
+              }
+            }
+            freqBin = freqBin + freqBins3[y];
+          }
+        }
+        leds.show();
+      }
+      break;
+
+    case fft_sideF_st:
+      while (isr_flag) {
+        if (fft.available()) {
+          freqBin = 0;
+          for (y = 0; y < HEIGHT; y++) {
+            level = fft.read(freqBin, freqBin + freqBins3[y] - 1);
+              for (x = 1; x < WIDTH / 2; x++) {
+              if (level >= thresholdHorizontal[(x * 2) + 1]) {
+                leds.setPixel(map_xy_sidL(x, y),   rainbowColors[y*6]);
+                leds.setPixel(map_xy_sidR_F(x, y), rainbowColors[y*6]);
+              } else {
+                leds.setPixel(map_xy_sidL(x, y),   BLACK);
+                leds.setPixel(map_xy_sidR_F(x, y), BLACK);
+              }
+            }
+            freqBin = freqBin + freqBins3[y];
+          }
+        }
+        leds.show();
+      }
+      break;
 
     case rainbow_st:
       while (isr_flag) {
@@ -299,7 +358,7 @@ void loop()
 
 void init_gridState(uint8_t LED_state)
 {
-  uint8_t   x;
+  uint8_t   x, y;
   static uint8_t prev_state = off_st;
 
   if (LED_state == prev_state) {
@@ -335,8 +394,25 @@ void init_gridState(uint8_t LED_state)
       leds.show();
       break;
 
+    case fft_side_st:
+      for (y = 0; y < HEIGHT; y++) {
+        leds.setPixel(map_xy_sidL(0, y), rainbowColors[y*6]);
+        leds.setPixel(map_xy_sidR(0, y), rainbowColors[y*6]);
+      }
+      leds.show();
+      break;
+
+      case fft_sideF_st:
+        for (y = 0; y < HEIGHT; y++) {
+          leds.setPixel(map_xy_sidL(0, y),   rainbowColors[y*6]);
+          leds.setPixel(map_xy_sidR_F(0, y), rainbowColors[y*6]);
+        }
+        leds.show();
+        break;
+
     case rainbow_st:
       break;
+
     case plaz_st:
       break;
 
@@ -353,7 +429,7 @@ void init_gridState(uint8_t LED_state)
 // Run once from setup, the compute the vertical levels
 void computeVerticalLevels()
 {
-  uint8_t y;
+  uint8_t x, y;
   float n, logLevel, linearLevel;
 
   for (y = 0; y < HEIGHT; y++) {
@@ -366,6 +442,18 @@ void computeVerticalLevels()
     Serial.print(HEIGHT - y - 1);
     Serial.print(": ");
     Serial.print(thresholdVertical[HEIGHT - y - 1], 5);
+    Serial.print("\n");
+  }
+  for (x = 0; x < WIDTH; x++) {
+    n = (float)x / (float)(WIDTH - 1);
+    logLevel = pow10f(n * -1.0 * (DYNAMIC_RANGE / 20.0));
+    linearLevel = 1.0 - n;
+    linearLevel = linearLevel * LINEAR_BLEND;
+    logLevel = logLevel * (1.0 - LINEAR_BLEND);
+    thresholdHorizontal[WIDTH - x - 1] = (logLevel + linearLevel) * MAX_LEVEL;
+    Serial.print(WIDTH - x - 1);
+    Serial.print(": ");
+    Serial.print(thresholdHorizontal[WIDTH - x - 1], 5);
     Serial.print("\n");
   }
 }
