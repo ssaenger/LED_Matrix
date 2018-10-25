@@ -9,6 +9,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include "Color.h"
+#include "GPIO.h"
 //#include <SerialFlash.h>
 
 //------------------------------------------------------------------------------
@@ -67,6 +68,7 @@ uint32_t* freqBins3;
 enum sm_states { fft_bot_st,   // shoot up from bottom
                  fft_top_st,   // shoot down from top
                  fft_btb_st,   // shoot from Both Top and Bottom
+                 fft_btbF_st,  // shoot from both top and bottom, fliggped
                  fft_mid_st,   // shoot from middle
                  fft_side_st,  // shoot from sides
                  fft_sideF_st, // shoot from sides, flipped
@@ -91,6 +93,7 @@ uint32_t* spectrum_getBin2();
 uint32_t* spectrum_getBin3();
 //uint32_t map_xy(uint32_t x, uint32_t y);
 void init_gridState(uint8_t LED_state);
+void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld);
 void computeVerticalLevels();
 inline uint8_t fastCosineCalc(uint16_t preWrapVal);
 void off();
@@ -103,6 +106,9 @@ void off();
 
 #define map_xy_top(x,y)   (x & 1) ? ((x * HEIGHT) + y) : \
                                     ((x * HEIGHT) + HEIGHT - 1 - y)
+
+#define map_xy_top_F(x,y)   (x & 1) ? (((WIDTH - 1 - x) * HEIGHT) + y) : \
+                                    (((WIDTH - x) * HEIGHT) - 1 - y)
 
 
 // together
@@ -157,6 +163,8 @@ void loop()
   static int8_t   x, y;
   static uint16_t  freqBin;
   static uint8_t  r, g, b;
+  buttonVal_t buttonPress;
+  uint8_t wasHeld = 0;
 
   init_gridState(LED_state);
   switch (LED_state) {
@@ -225,6 +233,28 @@ void loop()
       }
       break;
 
+      case fft_btbF_st:
+        while (isr_flag) {
+          if (fft.available()) {
+            freqBin = 0;
+            for (x = 0; x < WIDTH; x++) {
+              level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
+              for (y = 1; y < HEIGHT / 2; y++) {
+                if (level >= thresholdVertical[(y * 2) + 1]) {
+                  leds.setPixel(map_xy_bot(x, y), rainbowColors[x*5+y*2]);
+                  leds.setPixel(map_xy_top_F(x, y), rainbowColors[x*5+y*2]);
+                } else {
+                  leds.setPixel(map_xy_bot(x, y), BLACK);
+                  leds.setPixel(map_xy_top_F(x, y), BLACK);
+                }
+              }
+              freqBin = freqBin + freqBins2[x];
+            }
+          }
+          leds.show();
+        }
+        break;
+
     case fft_mid_st:
       while (isr_flag) {
         if (fft.available()) {
@@ -257,6 +287,7 @@ void loop()
         }
       }
       break;
+
     case fft_side_st:
       while (isr_flag) {
         if (fft.available()) {
@@ -350,9 +381,10 @@ void loop()
       break;
   }
 
-  // Debounce any switches. This line of code will be run
-  // once a button
-  GPIO_debounce();
+  // Debounce any buttons. This line of code will be run
+  // once a button is pressed.
+  buttonPress = GPIO_debounce(&wasHeld);
+  updateLedState(buttonPress, wasHeld);
 
 }
 
@@ -390,6 +422,14 @@ void init_gridState(uint8_t LED_state)
       leds.show();
       break;
 
+      case fft_btbF_st:
+        for (x = 0; x < WIDTH; x++) {
+          leds.setPixel(map_xy_bot(x, 0), rainbowColors[x*5]);
+          leds.setPixel(map_xy_top_F(x, 0), rainbowColors[x*5]);
+        }
+        leds.show();
+        break;
+
     case fft_mid_st:
       leds.show();
       break;
@@ -421,6 +461,32 @@ void init_gridState(uint8_t LED_state)
 
       case off_st:
         break;
+    default:
+      break;
+  }
+}
+
+void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
+{
+
+  if (wasHeld) {
+    // For now, treat any button press as same action
+    // TODO save last state and return to it when moving out of off_st
+    LED_state = off_st;
+    return;
+  }
+
+  switch (buttonPress) {
+    case BUTTON_RIGHT:
+      break;
+    case BUTTON_LEFT:
+      break;
+    case BUTTON_DOWN:
+      LED_state = (LED_state == 0) ? (NUM_STATES - 1) : (LED_state - 1);
+      break;
+    case BUTTON_UP:
+      LED_state = (LED_state + 1) % NUM_STATES;
+      break;
     default:
       break;
   }

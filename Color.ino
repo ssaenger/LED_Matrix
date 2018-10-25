@@ -1,4 +1,4 @@
-
+#include "Color.h"
 
 // Calculates the appropriate RGB values.
 uint32_t h2rgb(uint32_t v1, uint32_t v2, uint32_t hue)
