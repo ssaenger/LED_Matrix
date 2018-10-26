@@ -1,10 +1,12 @@
 #ifndef COLOR_H
 #define COLOR_H
 
+
+typedef uint32_t color_t;
 //------------------------------------------------------------------------------
 // https://www.rapidtables.com/web/color/RGB_Color.html
 #define BLACK   0x000000
-#define WHITE   0xFFFFFF
+#define DWHITE  0x999999
 #define RED     0xFF0000
 #define MAROON  0x800000
 #define YELLOW  0xFFFF00
@@ -75,6 +77,14 @@ const uint8_t exp_gamma[256] =
 227,229,232,234,236,239,241,244,246,249,251,253,254,255
 };
 //------------------------------------------------------------------------------
+
+
+#define FIXED_COLOR_NUM 18
+color_t fixedColors[FIXED_COLOR_NUM] = {
+  BLACK, RED, MAROON, YELLOW, ORANGE, GREEN,
+  LIME, BLUE, NAVY, CYAN, TEAL, MAGNETA, PINK,
+  PURPLE, OLIVE, GRAY, SILVER, DWHITE
+};
 
 
 #endif /* COLOR_H */

@@ -46,11 +46,16 @@ OctoWS2811 leds(LEDS_PER_PIN, displayMemory, drawingMemory, config);
 volatile byte isr_flag;
 
 // Color pointer
-uint32_t* curColor;
+color_t* curColor;
+
+color_t* onColor;
+color_t* offColor;
+
+
 
 // Holds the RGB values filled up by a call to makeColor()
 // Don't change this value unless you modify makeColor()
-uint32_t rainbowColors[COLOR_GRADIENT];
+color_t rainbowColors[COLOR_GRADIENT];
 
 // This array holds the volume level (0 to 1.0) for each
 // vertical pixel to turn on.  Computed in setup() using
@@ -126,7 +131,7 @@ void off();
                                      (((WIDTH - x) * HEIGHT) - HEIGHT + y)
 // reversed top right side
 #define map_xy_sidR_F(x,y)   (x & 1) ? (((WIDTH - 1 - x) * HEIGHT) + y) : \
-                                    (((WIDTH - x) * HEIGHT) - 1 - y)
+                                       (((WIDTH - x) * HEIGHT) - 1 - y)
 
 
 //------------------------------------------------------------------------------
@@ -137,10 +142,12 @@ void setup()
   isr_flag = 1;
   GPIO_init();
   AudioMemory(20); // The audio library needs memory to begin.
-  fft.windowFunction(AudioWindowWelch1024);
+  fft.windowFunction(AudioWindowHanning1024);
   // Fill out rainbowColors[]
   color_HSLtoRGB(SATURATION, LIGHTNESS, rainbowColors);
   curColor = rainbowColors;
+  onColor = fixedColors;
+  offColor = fixedColors;
 
   // Compute the vertical threshold
   computeVerticalLevels();
@@ -478,8 +485,8 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 
   switch (buttonPress) {
     case BUTTON_RIGHT:
-      break;
     case BUTTON_LEFT:
+      updateColor(buttonPress);
       break;
     case BUTTON_DOWN:
       LED_state = (LED_state == 0) ? (NUM_STATES - 1) : (LED_state - 1);
@@ -489,6 +496,18 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
       break;
     default:
       break;
+  }
+}
+
+void updateColor(buttonVal_t colorButton)
+{
+  //static 
+  if (colorButton == BUTTON_RIGHT) {
+    // update OnColor
+  }
+  else {
+    // update offColor
+
   }
 }
 
@@ -540,7 +559,7 @@ void testAll() {
   uint8_t x, y;
   for (x = 0; x < WIDTH; x++) {
     for (y = 0; y < HEIGHT ; y++) {
-      leds.setPixel(map_xy_bot(x, y), WHITE);
+      leds.setPixel(map_xy_bot(x, y), DWHITE);
       leds.show();
       delay(5);
     }

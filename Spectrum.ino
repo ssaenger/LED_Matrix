@@ -33,15 +33,42 @@ static uint32_t FreqBins3[LED_FIXED_HEIGHT] = {
    15, 16, 17, 18, 19, 20, 22, 23, 24, 25
 };
 
+// Looking at the source code, the sum of the freqBins array shouldn't be over 511
+// for some reason. So I'll check for that here, and remove it in the source code.
+uint32_t verifyMaxBin(uint32_t* arr) {
+  uint32_t n = sizeof(arr) / sizeof(arr[0]);
+  uint32_t sum = 0;
+  uint32_t i;
+
+  for (i = 0; i < n; i++) {
+    sum += arr[i];
+  }
+  return sum;
+}
 
 uint32_t* spectrum_getBin1() {
+  uint32_t sum = verifyMaxBin(FreqBins1);
+  if (sum >= BIN_LENGTH) {
+    Serial.println("ERROR. FreqBins1 summed values is too high!");
+    return 0;
+  }
   return FreqBins1;
 }
 
 uint32_t* spectrum_getBin2() {
+  uint32_t sum = verifyMaxBin(FreqBins2);
+  if (sum >= BIN_LENGTH) {
+    Serial.println("ERROR. FreqBins2 summed values is too high!");
+    return 0;
+  }
   return FreqBins2;
 }
 
 uint32_t* spectrum_getBin3() {
+  uint32_t sum = verifyMaxBin(FreqBins3);
+  if (sum >= BIN_LENGTH) {
+    Serial.println("ERROR. FreqBins3 summed values is too high!");
+    return 0;
+  }
   return FreqBins3;
 }
