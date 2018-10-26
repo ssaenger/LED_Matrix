@@ -68,6 +68,9 @@ uint32_t* freqBins1;
 uint32_t* freqBins2;
 uint32_t* freqBins3;
 
+uint32_t onColorInd;
+uint32_t offColorInd;
+
 
 #define NUM_STATES 9 // Make sure to update this if adding/removing states
 enum sm_states { fft_bot_st,   // shoot up from bottom
@@ -148,6 +151,8 @@ void setup()
   curColor = rainbowColors;
   onColor = fixedColors;
   offColor = fixedColors;
+  onColorInd = 1;
+  offColorInd = 0;
 
   // Compute the vertical threshold
   computeVerticalLevels();
@@ -156,7 +161,7 @@ void setup()
   freqBins2 = spectrum_getBin2();
   freqBins3 = spectrum_getBin3();
 
-  LED_state = fft_side_st;
+  LED_state = fft_bot_st;
   leds.begin();
   //testAll();
 
@@ -175,6 +180,7 @@ void loop()
 
   init_gridState(LED_state);
   switch (LED_state) {
+
     case fft_bot_st:
       while (isr_flag) {
         if (fft.available()) {
@@ -185,9 +191,9 @@ void loop()
             for (y = 1; y < HEIGHT; y++) {
 
               if (level >= thresholdVertical[y]) {
-                leds.setPixel(map_xy_bot(x, y), rainbowColors[x+x+y]);
+                leds.setPixel(map_xy_bot(x, y), onColor[onColorInd]);
               } else {
-                leds.setPixel(map_xy_bot(x, y), BLACK);
+                leds.setPixel(map_xy_bot(x, y), offColor[offColorInd]);
               }
             }
             freqBin = freqBin + freqBins2[x];
@@ -206,7 +212,7 @@ void loop()
 
               for (y = 1; y < HEIGHT; y++) {
                 if (level >= thresholdVertical[y]) {
-                  leds.setPixel(map_xy_top(x, y), rainbowColors[x+x+y]);
+                  leds.setPixel(map_xy_top(x, y), rainbowColors[x*5]);
                 } else {
                   leds.setPixel(map_xy_top(x, y), BLACK);
                 }
@@ -399,24 +405,36 @@ void init_gridState(uint8_t LED_state)
 {
   uint8_t   x, y;
   static uint8_t prev_state = off_st;
+  static uint32_t prevOnColorInd = onColorInd + 1;
+  static uint32_t prevOffColorInd = offColorInd + 1;
 
-  if (LED_state == prev_state) {
+  if ((LED_state == prev_state) &&
+      (prevOnColorInd == onColorInd) &&
+      (prevOffColorInd == offColorInd)) {
     return;
   }
+
   prev_state = LED_state;
+  prevOnColorInd = onColorInd;
+  prevOffColorInd = offColorInd;
 
   off();
   switch (LED_state) {
     case fft_bot_st:
       for (x = 0; x < WIDTH; x++) {
-        leds.setPixel(map_xy_bot(x, 0), rainbowColors[x+x+0]);
+        leds.setPixel(map_xy_bot(x, 0), onColor[onColorInd]);
+      }
+      for (x = 0; x < WIDTH; x++) {
+        for (y = 1; y < HEIGHT; y++) {
+          leds.setPixel(map_xy_bot(x, y), offColor[offColorInd]);
+        }
       }
       leds.show();
       break;
 
       case fft_top_st:
         for (x = 0; x < WIDTH; x++) {
-          leds.setPixel(map_xy_top(x, 0), rainbowColors[x+x+0]);
+          leds.setPixel(map_xy_top(x, 0), rainbowColors[x*5]);
         }
         leds.show();
         break;
@@ -484,9 +502,9 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
   }
 
   switch (buttonPress) {
-    case BUTTON_RIGHT:
-    case BUTTON_LEFT:
-      updateColor(buttonPress);
+    case BUTTON_RIGHT: // On Color
+    updateColor(buttonPress);
+    case BUTTON_LEFT: // Off Color
       break;
     case BUTTON_DOWN:
       LED_state = (LED_state == 0) ? (NUM_STATES - 1) : (LED_state - 1);
@@ -501,13 +519,23 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 
 void updateColor(buttonVal_t colorButton)
 {
-  //static 
   if (colorButton == BUTTON_RIGHT) {
     // update OnColor
+    if (onColor == fixedColors) {
+      onColorInd = (onColorInd + 1) % FIXED_COLOR_NUM;
+    }
+    else {
+
+    }
   }
   else {
     // update offColor
+    if (offColor == fixedColors) {
+      offColorInd = (offColorInd + 1) % FIXED_COLOR_NUM; // for now disable
+    }
+    else {
 
+    }
   }
 }
 
