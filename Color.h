@@ -8,10 +8,10 @@ typedef uint32_t color_t;
 #define BLACK   0x000000
 #define DWHITE  0x999999
 #define RED     0xFF0000
-#define MAROON  0x800000
+#define MAROON  0x100000  // was 80000000
 #define YELLOW  0xFFFF00
-#define ORANGE  0xFFA500
-#define GREEN   0x008000
+#define ORANGE  0xFF9500 // modified
+#define GREEN   0x001000 // was 0x008000
 #define LIME    0x00FF00
 #define BLUE    0x0000FF
 #define NAVY    0x000080
@@ -24,6 +24,18 @@ typedef uint32_t color_t;
 #define GRAY    0x808080
 #define SILVER  0xC0C0C0
 //------------------------------------------------------------------------------
+
+#define FIXED_COLOR_ON_NUM 10
+color_t fixedOnColors[FIXED_COLOR_ON_NUM] = {
+  BLACK, MAROON, OLIVE, ORANGE, GREEN,
+  NAVY, TEAL, MAGNETA, PURPLE, GRAY
+};
+
+#define FIXED_COLOR_OFF_NUM 10
+color_t fixedOffColors[FIXED_COLOR_OFF_NUM] = {
+  BLACK, 0x020000, 0x010100, 0x110100, 0x000200,
+  0x000002, 0x000101, 0x020002, 0x010001, 0x010101
+};
 
 
 //------------------------------------------------------------------------------
@@ -78,13 +90,6 @@ const uint8_t exp_gamma[256] =
 };
 //------------------------------------------------------------------------------
 
-
-#define FIXED_COLOR_NUM 18
-color_t fixedColors[FIXED_COLOR_NUM] = {
-  BLACK, RED, MAROON, YELLOW, ORANGE, GREEN,
-  LIME, BLUE, NAVY, CYAN, TEAL, MAGNETA, PINK,
-  PURPLE, OLIVE, GRAY, SILVER, DWHITE
-};
 
 
 #endif /* COLOR_H */

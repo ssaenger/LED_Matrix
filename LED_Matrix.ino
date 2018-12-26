@@ -68,8 +68,15 @@ uint32_t* freqBins1;
 uint32_t* freqBins2;
 uint32_t* freqBins3;
 
+// Index of the fixedColors array
+uint32_t fixedOnColor;
+uint32_t fixedOffColor;
 uint32_t onColorInd;
 uint32_t offColorInd;
+uint8_t isDynamic_onColor;
+uint8_t isRainbow_onColor;
+uint8_t isDynamic_offColor;
+uint8_t isRainbow_offColor;
 
 
 #define NUM_STATES 9 // Make sure to update this if adding/removing states
@@ -93,6 +100,8 @@ uint8_t LED_state;
 // Prototypes
 void GPIO_init();
 void GPIO_debounce();
+void Coor_plotLEDs(uint8_t LED_state);
+void Coor_mixedColors(uint8_t LED_state);
 void color_HSLtoRGB(uint32_t  saturation,
                     uint32_t  lightness,
                     uint32_t* rainbowColors);
@@ -102,40 +111,13 @@ uint32_t* spectrum_getBin3();
 //uint32_t map_xy(uint32_t x, uint32_t y);
 void init_gridState(uint8_t LED_state);
 void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld);
+void updateColor(buttonVal_t colorButton);
 void computeVerticalLevels();
 inline uint8_t fastCosineCalc(uint16_t preWrapVal);
 void off();
-//------------------------------------------------------------------------------
+void testAll(uint8_t repeat);
 
 //------------------------------------------------------------------------------
-// Macros
-#define map_xy_bot(x,y)   (x & 1) ? ((x * HEIGHT) + HEIGHT - 1 - y) : \
-                                    ((x * HEIGHT) + y)
-
-#define map_xy_top(x,y)   (x & 1) ? ((x * HEIGHT) + y) : \
-                                    ((x * HEIGHT) + HEIGHT - 1 - y)
-
-#define map_xy_top_F(x,y)   (x & 1) ? (((WIDTH - 1 - x) * HEIGHT) + y) : \
-                                    (((WIDTH - x) * HEIGHT) - 1 - y)
-
-
-// together
-#define map_xy_midTop(x,y,o) (x & 1) ? ((x * HEIGHT) + HEIGHT - 1 - (y + o)) : \
-                                       ((x * HEIGHT) + y + o)
-
-#define map_xy_midBot(x,y,o) (x & 1) ? ((x * HEIGHT) + y + o) : \
-                                       ((x * HEIGHT) + HEIGHT - 1 - (y + o))
-
-// sides
-#define map_xy_sidL(x,y)   (x & 1) ? ((x * HEIGHT) + HEIGHT - 1 - y) : \
-                                     ((x * HEIGHT) + y)
-
-#define map_xy_sidR(x,y)   (x & 1) ? (((WIDTH - x) * HEIGHT) - 1 - y) : \
-                                     (((WIDTH - x) * HEIGHT) - HEIGHT + y)
-// reversed top right side
-#define map_xy_sidR_F(x,y)   (x & 1) ? (((WIDTH - 1 - x) * HEIGHT) + y) : \
-                                       (((WIDTH - x) * HEIGHT) - 1 - y)
-
 
 //------------------------------------------------------------------------------
 
@@ -149,10 +131,16 @@ void setup()
   // Fill out rainbowColors[]
   color_HSLtoRGB(SATURATION, LIGHTNESS, rainbowColors);
   curColor = rainbowColors;
-  onColor = fixedColors;
-  offColor = fixedColors;
+  onColor = fixedOnColors;
+  offColor = fixedOffColors;
   onColorInd = 1;
   offColorInd = 0;
+  isDynamic_onColor = 0;
+  isRainbow_onColor = 0;
+  isDynamic_offColor = 0;
+  isRainbow_offColor = 0;
+  fixedOnColor = NAVY;
+  fixedOffColor = BLACK;
 
   // Compute the vertical threshold
   computeVerticalLevels();
@@ -163,332 +151,23 @@ void setup()
 
   LED_state = fft_bot_st;
   leds.begin();
-  //testAll();
+  //testAll(0);
 
 }
 
 void loop()
 {
-  static uint32_t frameCount = 0;
-  static float    level;
-  static uint16_t t, t2, t3;
-  static int8_t   x, y;
-  static uint16_t  freqBin;
-  static uint8_t  r, g, b;
   buttonVal_t buttonPress;
   uint8_t wasHeld = 0;
 
-  init_gridState(LED_state);
-  switch (LED_state) {
-
-    case fft_bot_st:
-      while (isr_flag) {
-        if (fft.available()) {
-          freqBin = 0;
-          for (x = 0; x < WIDTH; x++) {
-
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
-            for (y = 1; y < HEIGHT; y++) {
-
-              if (level >= thresholdVertical[y]) {
-                leds.setPixel(map_xy_bot(x, y), onColor[onColorInd]);
-              } else {
-                leds.setPixel(map_xy_bot(x, y), offColor[offColorInd]);
-              }
-            }
-            freqBin = freqBin + freqBins2[x];
-          }
-        }
-        leds.show();
-      }
-      break;
-
-      case fft_top_st:
-        while (isr_flag) {
-          if (fft.available()) {
-            freqBin = 0;
-            for (x = 0; x < WIDTH; x++) {
-              level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
-
-              for (y = 1; y < HEIGHT; y++) {
-                if (level >= thresholdVertical[y]) {
-                  leds.setPixel(map_xy_top(x, y), rainbowColors[x*5]);
-                } else {
-                  leds.setPixel(map_xy_top(x, y), BLACK);
-                }
-              }
-              freqBin = freqBin + freqBins2[x];
-            }
-          }
-          leds.show();
-        }
-        break;
-
-    case fft_btb_st:
-      while (isr_flag) {
-        if (fft.available()) {
-          freqBin = 0;
-          for (x = 0; x < WIDTH; x++) {
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
-            for (y = 1; y < HEIGHT / 2; y++) {
-              if (level >= thresholdVertical[(y * 2) + 1]) {
-                leds.setPixel(map_xy_bot(x, y), rainbowColors[x*5+y*2]);
-                leds.setPixel(map_xy_top(x, y), rainbowColors[x*5+y*2]);
-              } else {
-                leds.setPixel(map_xy_bot(x, y), BLACK);
-                leds.setPixel(map_xy_top(x, y), BLACK);
-              }
-            }
-            freqBin = freqBin + freqBins2[x];
-          }
-        }
-        leds.show();
-      }
-      break;
-
-      case fft_btbF_st:
-        while (isr_flag) {
-          if (fft.available()) {
-            freqBin = 0;
-            for (x = 0; x < WIDTH; x++) {
-              level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
-              for (y = 1; y < HEIGHT / 2; y++) {
-                if (level >= thresholdVertical[(y * 2) + 1]) {
-                  leds.setPixel(map_xy_bot(x, y), rainbowColors[x*5+y*2]);
-                  leds.setPixel(map_xy_top_F(x, y), rainbowColors[x*5+y*2]);
-                } else {
-                  leds.setPixel(map_xy_bot(x, y), BLACK);
-                  leds.setPixel(map_xy_top_F(x, y), BLACK);
-                }
-              }
-              freqBin = freqBin + freqBins2[x];
-            }
-          }
-          leds.show();
-        }
-        break;
-
-    case fft_mid_st:
-      while (isr_flag) {
-        if (fft.available()) {
-          freqBin = 0;
-          frameCount++;
-
-          for (x = 0; x < WIDTH; x++) {
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
-            for (y = 0; y < HEIGHT / 2 - 1; y++) {
-              if (level >= thresholdVertical[(y * 2) + 1] +
-                             (freqBins2[x] * thresholdVertical[0])) {
-                leds.setPixel(map_xy_midBot(x, y, HEIGHT / 2 + 1),
-                              curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
-                leds.setPixel(map_xy_midTop(x, y, HEIGHT / 2 + 1),
-                              curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
-              }
-              else {
-                leds.setPixel(map_xy_midBot(x, y, HEIGHT / 2 + 1), BLACK);
-                leds.setPixel(map_xy_midTop(x, y, HEIGHT / 2 + 1), BLACK);
-              }
-            }
-            // Fixed, center LEDs
-            leds.setPixel(map_xy_midBot(x, 0, HEIGHT / 2),
-                          curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
-            leds.setPixel(map_xy_midTop(x, 0, HEIGHT / 2),
-                          curColor[(x * 4 + frameCount) % COLOR_GRADIENT]);
-            freqBin = freqBin + freqBins2[x];
-          }
-          leds.show();
-        }
-      }
-      break;
-
-    case fft_side_st:
-      while (isr_flag) {
-        if (fft.available()) {
-          freqBin = 0;
-          for (y = 0; y < HEIGHT; y++) {
-            level = fft.read(freqBin, freqBin + freqBins3[y] - 1);
-              for (x = 1; x < WIDTH / 2; x++) {
-              if (level >= thresholdHorizontal[(x * 2) + 1]) {
-                leds.setPixel(map_xy_sidL(x, y), rainbowColors[y*6]);
-                leds.setPixel(map_xy_sidR(x, y), rainbowColors[y*6]);
-              } else {
-                leds.setPixel(map_xy_sidL(x, y), BLACK);
-                leds.setPixel(map_xy_sidR(x, y), BLACK);
-              }
-            }
-            freqBin = freqBin + freqBins3[y];
-          }
-        }
-        leds.show();
-      }
-      break;
-
-    case fft_sideF_st:
-      while (isr_flag) {
-        if (fft.available()) {
-          freqBin = 0;
-          for (y = 0; y < HEIGHT; y++) {
-            level = fft.read(freqBin, freqBin + freqBins3[y] - 1);
-              for (x = 1; x < WIDTH / 2; x++) {
-              if (level >= thresholdHorizontal[(x * 2) + 1]) {
-                leds.setPixel(map_xy_sidL(x, y),   rainbowColors[y*6]);
-                leds.setPixel(map_xy_sidR_F(x, y), rainbowColors[y*6]);
-              } else {
-                leds.setPixel(map_xy_sidL(x, y),   BLACK);
-                leds.setPixel(map_xy_sidR_F(x, y), BLACK);
-              }
-            }
-            freqBin = freqBin + freqBins3[y];
-          }
-        }
-        leds.show();
-      }
-      break;
-
-    case rainbow_st:
-      while (isr_flag) {
-        frameCount++;
-        for (x = 1; x < WIDTH - 1; x++) {
-          for (y = 1; y < HEIGHT - 1; y++) {
-            leds.setPixel(map_xy_bot(x, y),
-                          curColor[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
-          }
-        }
-        delay(50);
-        leds.show();
-      }
-      break;
-
-    case plaz_st:
-      while(isr_flag) {
-        frameCount++;
-        t  = fastCosineCalc((30 * frameCount)/100); // time displacement
-        t2 = fastCosineCalc((20 * frameCount)/100); // fiddle with these
-        t3 = fastCosineCalc((45 * frameCount)/100); // to change looks
-
-        for (x = 1; x < WIDTH - 1; x++) {
-          for (y = 1; y < HEIGHT - 1; y++) {
-            //Calculate 3 seperate plasma waves, one for each color channel
-            r = fastCosineCalc(((x << 3) +
-                    (t >> 1) + fastCosineCalc((t2 + (y << 3)))));
-            g = fastCosineCalc(((y << 3) +
-                    t + fastCosineCalc(((t3 >> 2) + (x << 3)))));
-            b = fastCosineCalc(((y << 3) +
-                    t2 + fastCosineCalc((t + x + (g >> 2)))));
-            //uncomment the following to enable gamma correction
-            r = exp_gamma[r];
-            g = exp_gamma[g];
-            b = exp_gamma[b];
-            leds.setPixel(map_xy_bot(x,y), ((r << 16) | (g << 8) | b));
-          }
-        }
-        leds.show();
-      }
-      break;
-    //case glediator_st:
-      //break;
-      case off_st:
-        while(isr_flag);
-        break;
-    default:
-      break;
-  }
+  //init_gridState(LED_state);
+  Coor_plotLEDs(LED_state); // Only returns once button is pressed
 
   // Debounce any buttons. This line of code will be run
   // once a button is pressed.
   buttonPress = GPIO_debounce(&wasHeld);
   updateLedState(buttonPress, wasHeld);
 
-}
-
-void init_gridState(uint8_t LED_state)
-{
-  uint8_t   x, y;
-  static uint8_t prev_state = off_st;
-  static uint32_t prevOnColorInd = onColorInd + 1;
-  static uint32_t prevOffColorInd = offColorInd + 1;
-
-  if ((LED_state == prev_state) &&
-      (prevOnColorInd == onColorInd) &&
-      (prevOffColorInd == offColorInd)) {
-    return;
-  }
-
-  prev_state = LED_state;
-  prevOnColorInd = onColorInd;
-  prevOffColorInd = offColorInd;
-
-  off();
-  switch (LED_state) {
-    case fft_bot_st:
-      for (x = 0; x < WIDTH; x++) {
-        leds.setPixel(map_xy_bot(x, 0), onColor[onColorInd]);
-      }
-      for (x = 0; x < WIDTH; x++) {
-        for (y = 1; y < HEIGHT; y++) {
-          leds.setPixel(map_xy_bot(x, y), offColor[offColorInd]);
-        }
-      }
-      leds.show();
-      break;
-
-      case fft_top_st:
-        for (x = 0; x < WIDTH; x++) {
-          leds.setPixel(map_xy_top(x, 0), rainbowColors[x*5]);
-        }
-        leds.show();
-        break;
-
-    case fft_btb_st:
-      for (x = 0; x < WIDTH; x++) {
-        leds.setPixel(map_xy_bot(x, 0), rainbowColors[x*5]);
-        leds.setPixel(map_xy_top(x, 0), rainbowColors[x*5]);
-      }
-      leds.show();
-      break;
-
-      case fft_btbF_st:
-        for (x = 0; x < WIDTH; x++) {
-          leds.setPixel(map_xy_bot(x, 0), rainbowColors[x*5]);
-          leds.setPixel(map_xy_top_F(x, 0), rainbowColors[x*5]);
-        }
-        leds.show();
-        break;
-
-    case fft_mid_st:
-      leds.show();
-      break;
-
-    case fft_side_st:
-      for (y = 0; y < HEIGHT; y++) {
-        leds.setPixel(map_xy_sidL(0, y), rainbowColors[y*6]);
-        leds.setPixel(map_xy_sidR(0, y), rainbowColors[y*6]);
-      }
-      leds.show();
-      break;
-
-      case fft_sideF_st:
-        for (y = 0; y < HEIGHT; y++) {
-          leds.setPixel(map_xy_sidL(0, y),   rainbowColors[y*6]);
-          leds.setPixel(map_xy_sidR_F(0, y), rainbowColors[y*6]);
-        }
-        leds.show();
-        break;
-
-    case rainbow_st:
-      break;
-
-    case plaz_st:
-      break;
-
-    //case glediator_st:
-    //  break;
-
-      case off_st:
-        break;
-    default:
-      break;
-  }
 }
 
 void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
@@ -503,8 +182,8 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 
   switch (buttonPress) {
     case BUTTON_RIGHT: // On Color
-    updateColor(buttonPress);
     case BUTTON_LEFT: // Off Color
+      updateColor(buttonPress);
       break;
     case BUTTON_DOWN:
       LED_state = (LED_state == 0) ? (NUM_STATES - 1) : (LED_state - 1);
@@ -521,20 +200,43 @@ void updateColor(buttonVal_t colorButton)
 {
   if (colorButton == BUTTON_RIGHT) {
     // update OnColor
-    if (onColor == fixedColors) {
-      onColorInd = (onColorInd + 1) % FIXED_COLOR_NUM;
+    if (isRainbow_onColor) {
+      if (isDynamic_onColor) {
+        isDynamic_onColor = 0;
+        isRainbow_onColor = 0;
+      }
+      else {
+        isDynamic_onColor = 1;
+      }
     }
     else {
-
+      onColorInd = (onColorInd + 1) % FIXED_COLOR_ON_NUM;
+      fixedOnColor = fixedOnColors[onColorInd];
+      if (fixedOnColor == BLACK) {
+        isRainbow_onColor = 1;
+        isDynamic_onColor = 0;
+      }
     }
+
   }
   else {
     // update offColor
-    if (offColor == fixedColors) {
-      offColorInd = (offColorInd + 1) % FIXED_COLOR_NUM; // for now disable
+    if (isRainbow_offColor) {
+      if (isDynamic_offColor) {
+        isDynamic_offColor = 0;
+        isRainbow_offColor = 0;
+      }
+      else {
+        isDynamic_offColor = 1;
+      }
     }
     else {
-
+      offColorInd = (offColorInd + 1) % FIXED_COLOR_ON_NUM;
+      fixedOffColor = fixedOffColors[offColorInd];
+      if (fixedOffColor == BLACK) {
+        isRainbow_offColor = 1;
+        isDynamic_offColor = 0;
+      }
     }
   }
 }
@@ -568,33 +270,5 @@ void computeVerticalLevels()
     Serial.print(": ");
     Serial.print(thresholdHorizontal[WIDTH - x - 1], 5);
     Serial.print("\n");
-  }
-}
-
-void off() {
-  uint8_t x, y;
-
-  for (x = 0; x < WIDTH; x++) {
-    for (y = 0; y < HEIGHT; y++) {
-      leds.setPixel(map_xy_bot(x, y), BLACK);
-    }
-  }
-  leds.show();
-}
-
-
-void testAll() {
-  uint8_t x, y;
-  for (x = 0; x < WIDTH; x++) {
-    for (y = 0; y < HEIGHT ; y++) {
-      leds.setPixel(map_xy_bot(x, y), DWHITE);
-      leds.show();
-      delay(5);
-    }
-    delay(10);
-    for (y = 0; y < HEIGHT ; y++) {
-      leds.setPixel(map_xy_bot(x, y), BLACK);
-    }
-    leds.show();
   }
 }

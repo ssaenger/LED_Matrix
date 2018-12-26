@@ -1,7 +1,7 @@
 #include "GPIO.h"
 
 // GPIO_debounce counter values
-#define DEBOUNCE_MAX_VAL 0xAAA   // Higher val = longer to register button press
+#define DEBOUNCE_MAX_VAL 0xABC   // Higher val = longer to register button press
 #define HOLD_TIME_VAL    0x3FFFF // higher val = longer hold time to register
 
 enum deb_states { wait_st,
@@ -71,7 +71,6 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
   static buttonVal_t registeredButton_val = 0;
   uint8_t success = 0; // Assume don't know what button value is.
 
-  debugStatePrint();
   switch(deb_state) {
     case wait_st:
     if (!isr_flag){
@@ -103,7 +102,7 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
                         (!digitalRead(M_F_PIN)  << 1) |
                         (!digitalRead(M_B_PIN));
       if (reg_counter > HOLD_TIME_VAL) {
-        // We've held the buttons for a deteremined amount of time.
+        // We've held the buttons for a determined amount of time.
         reg_counter = 0;
         success = 1; // Indicate success in determining action to take
 
@@ -147,6 +146,7 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
       }
       break;
   }
+  debugStatePrint();
 
   if (success) {
     return registeredButton_val;
