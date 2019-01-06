@@ -12,8 +12,8 @@
 typedef uint8_t buttonVal_t;
 #define BUTTON_UP    0x08
 #define BUTTON_DOWN  0x04
-#define BUTTON_LEFT  0x02
-#define BUTTON_RIGHT 0x01
+#define BUTTON_RIGHT 0x02
+#define BUTTON_LEFT  0x01
 
 buttonVal_t GPIO_debounce(uint8_t* wasHeld);
 

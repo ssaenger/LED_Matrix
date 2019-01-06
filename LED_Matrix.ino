@@ -25,9 +25,13 @@ AudioConnection          patchCord3(mixer1, fft);
 //------------------------------------------------------------------------------
 // OctoWS2811 definitions
 #define LEDS_PER_PIN   360    // My LED Matrix is divided up into 8 diff sectors
+
+// These values that are set apply only at startup
 #define MAX_LEVEL      0.30f  // 1.0 = max, lower is more "sensitive"
 #define DYNAMIC_RANGE  40.0f  // Smaller number = harder to overcome init thresh
 #define LINEAR_BLEND   0.5f   // useful range is 0 to 0.7
+//---
+
 DMAMEM uint32_t displayMemory[LEDS_PER_PIN*6];
 uint32_t drawingMemory[LEDS_PER_PIN*6];
 const uint32_t config = WS2811_GRB | WS2811_800kHz;
@@ -79,7 +83,7 @@ uint8_t isDynamic_offColor;
 uint8_t isRainbow_offColor;
 
 
-#define NUM_STATES 9 // Make sure to update this if adding/removing states
+#define NUM_STATES 10 // Make sure to update this if adding/removing states
 enum sm_states { fft_bot_st,   // shoot up from bottom
                  fft_top_st,   // shoot down from top
                  fft_btb_st,   // shoot from Both Top and Bottom
@@ -89,10 +93,11 @@ enum sm_states { fft_bot_st,   // shoot up from bottom
                  fft_sideF_st, // shoot from sides, flipped
                  rainbow_st,   // display the rainbow
                  plaz_st,      // display neat math rainbow
-                 //glediator_st, // Use the glediator software on PC
-                 off_st
+                 idle_st,      // pretty, non-bright ambient look
+                 off_st        // NUM_STATES doesn't count this.
 };
 uint8_t LED_state;
+uint8_t LED_statePrev;
 //------------------------------------------------------------------------------
 
 
@@ -109,13 +114,13 @@ uint32_t* spectrum_getBin1();
 uint32_t* spectrum_getBin2();
 uint32_t* spectrum_getBin3();
 //uint32_t map_xy(uint32_t x, uint32_t y);
-void init_gridState(uint8_t LED_state);
+//void init_gridState(uint8_t LED_state);
 void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld);
 void updateColor(buttonVal_t colorButton);
-void computeVerticalLevels();
+void computeLevels(float maxLevel, float dynamicRange, float linearBlend);
 inline uint8_t fastCosineCalc(uint16_t preWrapVal);
-void off();
-void testAll(uint8_t repeat);
+void Coor_off();
+void Coor_testAll(uint8_t repeat);
 
 //------------------------------------------------------------------------------
 
@@ -143,15 +148,16 @@ void setup()
   fixedOffColor = BLACK;
 
   // Compute the vertical threshold
-  computeVerticalLevels();
+  computeLevels(0.3, 40.0, 0.5);
 
   freqBins1 = spectrum_getBin1();
   freqBins2 = spectrum_getBin2();
   freqBins3 = spectrum_getBin3();
 
   LED_state = fft_bot_st;
+  LED_statePrev = fft_bot_st;
   leds.begin();
-  //testAll(0);
+  //Coor_testAll(0);
 
 }
 
@@ -160,7 +166,6 @@ void loop()
   buttonVal_t buttonPress;
   uint8_t wasHeld = 0;
 
-  //init_gridState(LED_state);
   Coor_plotLEDs(LED_state); // Only returns once button is pressed
 
   // Debounce any buttons. This line of code will be run
@@ -170,35 +175,61 @@ void loop()
 
 }
 
+// Depending on the button press and if it was held or not, this will update
+// the variable LED_state
 void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 {
+  static float max_level = MAX_LEVEL;
+  static float dynamic_range = DYNAMIC_RANGE;
+  static float linear_blend = LINEAR_BLEND;
 
   if (wasHeld) {
     // For now, treat any button press as same action
-    // TODO save last state and return to it when moving out of off_st
+    LED_statePrev = LED_state;
     LED_state = off_st;
     return;
   }
 
   switch (buttonPress) {
+    case 0:
+      break;
+
     case BUTTON_RIGHT: // On Color
     case BUTTON_LEFT: // Off Color
       updateColor(buttonPress);
       break;
+
     case BUTTON_DOWN:
+      if (LED_state == off_st) {
+        LED_state = LED_statePrev;
+        LED_statePrev = off_st;
+      }
       LED_state = (LED_state == 0) ? (NUM_STATES - 1) : (LED_state - 1);
       break;
+
     case BUTTON_UP:
+      if (LED_state == off_st) {
+        LED_state = LED_statePrev;
+        LED_statePrev = off_st;
+      }
       LED_state = (LED_state + 1) % NUM_STATES;
       break;
+
     default:
+      if (buttonPress == (BUTTON_LEFT | BUTTON_DOWN)) {
+        max_level = (max_level < 0.06) ? 0.65 : max_level - 0.05;
+        dynamic_range = (dynamic_range < 6) ? DYNAMIC_RANGE : dynamic_range - 5;
+        linear_blend = (linear_blend < 0.11) ? 0.7 : linear_blend - 0.05;
+        computeLevels(max_level, dynamic_range, linear_blend);
+      }
       break;
   }
 }
 
+
 void updateColor(buttonVal_t colorButton)
 {
-  if (colorButton == BUTTON_RIGHT) {
+  if (colorButton == BUTTON_LEFT) {
     // update OnColor
     if (isRainbow_onColor) {
       if (isDynamic_onColor) {
@@ -241,31 +272,46 @@ void updateColor(buttonVal_t colorButton)
   }
 }
 
-// Run once from setup, the compute the vertical levels
-void computeVerticalLevels()
+// Computes the vertical and horizontal levels. Call during setup and when
+// wanting to change the levels after button presses.
+// maxLevel  = 1.0 is max, lower is more "sensitive"
+// dynamicRange = Smaller number means harder to overcome init thresh
+// linearBlend = useful range is 0 to 0.7
+void computeLevels(float maxLevel, float dynamicRange, float linearBlend)
 {
   uint8_t x, y;
   float n, logLevel, linearLevel;
 
+  Serial.print("maxLevel = ");
+  Serial.println(maxLevel);
+  Serial.print("dynamicRange = ");
+  Serial.println(dynamicRange);
+  Serial.print("linearBlend = ");
+  Serial.println(linearBlend);
+  Serial.println("---------------------");
+
+// Compute vertical values (for when LED_state is showing bars going up-down)
   for (y = 0; y < HEIGHT; y++) {
     n = (float)y / (float)(HEIGHT - 1);
-    logLevel = pow10f(n * -1.0 * (DYNAMIC_RANGE / 20.0));
+    logLevel = pow10f(n * -1.0 * (dynamicRange / 20.0));
     linearLevel = 1.0 - n;
-    linearLevel = linearLevel * LINEAR_BLEND;
-    logLevel = logLevel * (1.0 - LINEAR_BLEND);
-    thresholdVertical[HEIGHT - y - 1] = (logLevel + linearLevel) * MAX_LEVEL;
+    linearLevel = linearLevel * linearBlend;
+    logLevel = logLevel * (1.0 - linearBlend);
+    thresholdVertical[HEIGHT - y - 1] = (logLevel + linearLevel) * maxLevel;
     Serial.print(HEIGHT - y - 1);
     Serial.print(": ");
     Serial.print(thresholdVertical[HEIGHT - y - 1], 5);
     Serial.print("\n");
   }
+  // Compute horizontal values (for when LED_state is showing bars going
+  // side-to-side)
   for (x = 0; x < WIDTH; x++) {
     n = (float)x / (float)(WIDTH - 1);
-    logLevel = pow10f(n * -1.0 * (DYNAMIC_RANGE / 20.0));
+    logLevel = pow10f(n * -1.0 * (dynamicRange / 20.0));
     linearLevel = 1.0 - n;
-    linearLevel = linearLevel * LINEAR_BLEND;
-    logLevel = logLevel * (1.0 - LINEAR_BLEND);
-    thresholdHorizontal[WIDTH - x - 1] = (logLevel + linearLevel) * MAX_LEVEL;
+    linearLevel = linearLevel * linearBlend;
+    logLevel = logLevel * (1.0 - linearBlend);
+    thresholdHorizontal[WIDTH - x - 1] = (logLevel + linearLevel) * maxLevel;
     Serial.print(WIDTH - x - 1);
     Serial.print(": ");
     Serial.print(thresholdHorizontal[WIDTH - x - 1], 5);

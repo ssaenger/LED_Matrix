@@ -1,6 +1,7 @@
+//------------------------------------------------------------------------------
 // Macros
-#define map_xy_bot(x,y)   (x & 1) ? ((x * HEIGHT) + HEIGHT - 1 - y) : \
-                                    ((x * HEIGHT) + y)
+#define map_xy_bot(x,y)   ((x) & 1) ? (((x) * HEIGHT) + HEIGHT - 1 - (y)) : \
+                                    (((x) * HEIGHT) + (y))
 
 #define map_xy_top(x,y)   (x & 1) ? ((x * HEIGHT) + y) : \
                                     ((x * HEIGHT) + HEIGHT - 1 - y)
@@ -22,13 +23,18 @@
 
 #define map_xy_sidR(x,y)   (x & 1) ? (((WIDTH - x) * HEIGHT) - 1 - y) : \
                                      (((WIDTH - x) * HEIGHT) - HEIGHT + y)
-// reversed top right side
+// reversed top right side. Same as top_F
 #define map_xy_sidR_F(x,y)   (x & 1) ? (((WIDTH - 1 - x) * HEIGHT) + y) : \
                                        (((WIDTH - x) * HEIGHT) - 1 - y)
-
+//------------------------------------------------------------------------------
 
 #define pick_color(x, f, c, r)   (r ? rainbowColors[((x) + f) % COLOR_GRADIENT] : c)
 #define pick_color(x, f, c, r)  (r ? rainbowColors[((x) + f) % COLOR_GRADIENT] : c)
+
+//------------------------------------------------------------------------------
+// Prototypes
+void coorSweep();
+//------------------------------------------------------------------------------
 
 // The entire matrix has one color
 void Coor_plotLEDs(uint8_t LED_state) {
@@ -39,6 +45,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
   static int8_t   x, y;
   static uint16_t  freqBin;
   static uint8_t  r, g, b;
+  static uint8_t firstPass = 1;
 
 
   switch(LED_state) {
@@ -206,7 +213,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
     case fft_side_st:
     // need to blank out center strip
     if (isr_flag) {
-      off();
+      Coor_off();
     }
       while (isr_flag) {
         if (fft.available()) {
@@ -243,7 +250,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
     case fft_sideF_st:
     // need to blank out center strip
     if (isr_flag) {
-      off();
+      Coor_off();
     }
       while (isr_flag) {
         if (fft.available()) {
@@ -279,7 +286,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
 
     case rainbow_st:
       if (isr_flag) {
-        off();
+        Coor_off();
       }
       while (isr_flag) {
         frameCount++;
@@ -296,7 +303,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
 
     case plaz_st:
       if (isr_flag) {
-        off();
+        Coor_off();
       }
       while(isr_flag) {
         frameCount++;
@@ -325,10 +332,117 @@ void Coor_plotLEDs(uint8_t LED_state) {
       break;
     //case glediator_st:
       //break;
-      case off_st:
-        while(isr_flag);
+
+    case idle_st:
+      while(isr_flag) {
+        coorSweep();
+      }
+      break;
+    case off_st:
+      if (firstPass) {
+        Coor_off();
+        firstPass = 0;
+      }
+      else {
+        if (isr_flag) {
+          firstPass = 1;
+        }
+        while(isr_flag); // wait here till button press
+      }
         break;
     default:
+      break;
+  }
+}
+
+
+void coorSweep()
+{
+  static uint8_t step = 0;
+  static uint32_t frameCount = 1;
+  int8_t   x = 0;
+  int8_t   y = 0;
+  frameCount += frameCount * 2;
+  // sweep from left to right
+  switch(step) {
+
+    case 0:
+      for (y = 0; y < HEIGHT; y++) {
+        leds.setPixel(map_xy_bot(0, y),
+                rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+      }
+      leds.show();
+      step++;
+    break;
+
+    case 1:
+      for (x = 1; x < WIDTH; x++) {
+        for (y = 0; y < HEIGHT; y++) {
+          leds.setPixel(map_xy_bot(x, y),
+                  rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+          leds.setPixel(map_xy_bot(x - 1, y), BLACK);
+        }
+        leds.show();
+      }
+      step++;
+      break;
+
+    case 2:
+      for (y = 0; y < HEIGHT; y++) {
+        leds.setPixel(map_xy_bot(WIDTH - 1, y), BLACK);
+      }
+      leds.show();
+      step++;
+      break;
+
+      // sweep from bottom to top
+    case 3:
+      for (y = 0; y < 3; y++) {
+        for (x = 0; x < WIDTH; x++) {
+          if (y == 2) {
+            leds.setPixel(map_xy_bot(x, y),
+              rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+            leds.setPixel(map_xy_bot(x, 0), BLACK);
+          } else {
+            leds.setPixel(map_xy_bot(x, y),
+              rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+          }
+        }
+        leds.show();
+      }
+      step++;
+      break;
+
+    case 4:
+      for (; y < HEIGHT; y++) {
+        for (x = 0; x < WIDTH; x++) {
+          leds.setPixel(map_xy_bot(x, y),
+                  rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+          leds.setPixel(map_xy_bot(x, y - 1),
+                  rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+          leds.setPixel(map_xy_bot(x, y - 2), BLACK);
+        }
+        leds.show();
+      }
+      step++;
+      break;
+
+    case 5:
+      for (x = 0; x < WIDTH; x++) {
+        leds.setPixel(map_xy_bot(x, HEIGHT - 1),
+                rainbowColors[(x * 4 + y * 2 + frameCount) % COLOR_GRADIENT]);
+        leds.setPixel(map_xy_bot(x, HEIGHT - 2), BLACK);
+      }
+      leds.show();
+      step++;
+      break;
+
+    case 6:
+      for (x = 0; x < WIDTH; x++) {
+        leds.setPixel(map_xy_bot(x, HEIGHT - 1), BLACK);
+      }
+      leds.show();
+      step = 0;
       break;
   }
 }
@@ -350,7 +464,7 @@ void init_gridState(uint8_t LED_state)
   prevOnColorInd = onColorInd;
   prevOffColorInd = offColorInd;
 
-  off();
+  Coor_off();
   switch (LED_state) {
     case fft_bot_st:
       for (x = 0; x < WIDTH; x++) {
@@ -426,8 +540,7 @@ void init_gridState(uint8_t LED_state)
 
 
 
-void off() {
-  Serial.println("inside");
+void Coor_off() {
   uint8_t x, y;
   for (x = 0; x < WIDTH; x++) {
     for (y = 0; y < HEIGHT; y++) {
@@ -438,7 +551,7 @@ void off() {
 }
 
 
-void testAll(uint8_t repeat) {
+void Coor_testAll(uint8_t repeat) {
   uint8_t x, y;
   while (repeat && isr_flag) {
     for (x = 0; x < WIDTH; x++) {
@@ -456,95 +569,7 @@ void testAll(uint8_t repeat) {
   }
 }
 
-
-/*
-void init_gridState(uint8_t LED_state)
+Coor_showState(uint8_t show)
 {
-uint8_t   x, y;
-static uint8_t prev_state = off_st;
-static uint32_t prevOnColorInd = onColorInd + 1;
-static uint32_t prevOffColorInd = offColorInd + 1;
-
-if ((LED_state == prev_state) &&
-  (prevOnColorInd == onColorInd) &&
-  (prevOffColorInd == offColorInd)) {
-return;
+  
 }
-
-prev_state = LED_state;
-prevOnColorInd = onColorInd;
-prevOffColorInd = offColorInd;
-
-off();
-switch (LED_state) {
-case fft_bot_st:
-  for (x = 0; x < WIDTH; x++) {
-    leds.setPixel(map_xy_bot(x, 0), onColor[onColorInd]);
-  }
-  for (x = 0; x < WIDTH; x++) {
-    for (y = 1; y < HEIGHT; y++) {
-      leds.setPixel(map_xy_bot(x, y), offColor[offColorInd]);
-    }
-  }
-  leds.show();
-  break;
-
-  case fft_top_st:
-    for (x = 0; x < WIDTH; x++) {
-      leds.setPixel(map_xy_top(x, 0), rainbowColors[x*5]);
-    }
-    leds.show();
-    break;
-
-case fft_btb_st:
-  for (x = 0; x < WIDTH; x++) {
-    leds.setPixel(map_xy_bot(x, 0), rainbowColors[x*5]);
-    leds.setPixel(map_xy_top(x, 0), rainbowColors[x*5]);
-  }
-  leds.show();
-  break;
-
-  case fft_btbF_st:
-    for (x = 0; x < WIDTH; x++) {
-      leds.setPixel(map_xy_bot(x, 0), rainbowColors[x*5]);
-      leds.setPixel(map_xy_top_F(x, 0), rainbowColors[x*5]);
-    }
-    leds.show();
-    break;
-
-case fft_mid_st:
-  leds.show();
-  break;
-
-case fft_side_st:
-  for (y = 0; y < HEIGHT; y++) {
-    leds.setPixel(map_xy_sidL(0, y), rainbowColors[y*6]);
-    leds.setPixel(map_xy_sidR(0, y), rainbowColors[y*6]);
-  }
-  leds.show();
-  break;
-
-  case fft_sideF_st:
-    for (y = 0; y < HEIGHT; y++) {
-      leds.setPixel(map_xy_sidL(0, y),   rainbowColors[y*6]);
-      leds.setPixel(map_xy_sidR_F(0, y), rainbowColors[y*6]);
-    }
-    leds.show();
-    break;
-
-case rainbow_st:
-  break;
-
-case plaz_st:
-  break;
-
-//case glediator_st:
-//  break;
-
-  case off_st:
-    break;
-default:
-  break;
-}
-}
-*/

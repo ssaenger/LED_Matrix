@@ -2,7 +2,7 @@
 
 // GPIO_debounce counter values
 #define DEBOUNCE_MAX_VAL 0xABC   // Higher val = longer to register button press
-#define HOLD_TIME_VAL    0x3FFFF // higher val = longer hold time to register
+#define HOLD_TIME_VAL    0x3ABCD // higher val = longer hold time to register
 
 enum deb_states { wait_st,
                   debounce_st,
@@ -96,7 +96,6 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
 
     case register_st:
       reg_counter++;
-      //Serial.println(reg_counter, HEX);
       currButton_val =  (!digitalRead(C_UP_PIN) << 3) |
                         (!digitalRead(C_DN_PIN) << 2) |
                         (!digitalRead(M_F_PIN)  << 1) |
