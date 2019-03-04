@@ -344,14 +344,14 @@ void Coor_plotLEDs(uint8_t LED_state) {
         firstPass = 0;
       }
       else {
-        if (isr_flag) {
-          firstPass = 1;
-        }
         while(isr_flag); // wait here till button press
       }
         break;
     default:
       break;
+  }
+  if (LED_state != firstPass) {
+    firstPass = 1;
   }
 }
 
@@ -558,7 +558,7 @@ void Coor_testAll(uint8_t repeat) {
       for (y = 0; y < HEIGHT ; y++) {
         leds.setPixel(map_xy_bot(x, y), GRAY);
         leds.show();
-        delay(2);
+        delay(3);
       }
       delay(10);
       for (y = 0; y < HEIGHT ; y++) {
@@ -567,9 +567,4 @@ void Coor_testAll(uint8_t repeat) {
       leds.show();
     }
   }
-}
-
-Coor_showState(uint8_t show)
-{
-  
 }

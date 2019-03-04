@@ -12,6 +12,11 @@
 #include "GPIO.h"
 //#include <SerialFlash.h>
 
+// Normally the buttons are used to change the LED matrix state and colors
+// Setting this define to 1 will allow you to use the buttons to try out
+// new level values.
+#define TRY_NEW_LEVEL_VALUES 0
+
 //------------------------------------------------------------------------------
 // FFT definitions. Audio comes from computer through USB
 AudioInputUSB            usb1;
@@ -30,6 +35,8 @@ AudioConnection          patchCord3(mixer1, fft);
 #define MAX_LEVEL      0.30f  // 1.0 = max, lower is more "sensitive"
 #define DYNAMIC_RANGE  40.0f  // Smaller number = harder to overcome init thresh
 #define LINEAR_BLEND   0.5f   // useful range is 0 to 0.7
+
+#define MAX_LEVELS_PROFILE 4
 //---
 
 DMAMEM uint32_t displayMemory[LEDS_PER_PIN*6];
@@ -55,6 +62,13 @@ color_t* curColor;
 color_t* onColor;
 color_t* offColor;
 
+typedef struct _levels {
+  float max_level;
+  float dynamic_range;
+  float linear_blend;
+} levels;
+
+levels levelsArray[MAX_LEVELS_PROFILE];
 
 
 // Holds the RGB values filled up by a call to makeColor()
@@ -148,16 +162,22 @@ void setup()
   fixedOffColor = BLACK;
 
   // Compute the vertical threshold
-  computeLevels(0.3, 40.0, 0.5);
+  levelsArray[0] = {0.06, 32.00, 0.30}; // Very quiet music
+  levelsArray[1] = {0.10, 30.00, 0.60}; // Medium music
+  levelsArray[2] = {0.12, 24.00, 0.20}; // Medium music
+  levelsArray[3] = {0.28, 40.00, 0.50}; // LOUD music
+  computeLevels(levelsArray[0].max_level,
+                levelsArray[0].dynamic_range,
+                levelsArray[0].linear_blend);
 
   freqBins1 = spectrum_getBin1();
   freqBins2 = spectrum_getBin2();
   freqBins3 = spectrum_getBin3();
 
-  LED_state = fft_bot_st;
+  LED_state = fft_mid_st;
   LED_statePrev = fft_bot_st;
   leds.begin();
-  //Coor_testAll(0);
+  Coor_testAll(0);
 
 }
 
@@ -179,9 +199,7 @@ void loop()
 // the variable LED_state
 void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 {
-  static float max_level = MAX_LEVEL;
-  static float dynamic_range = DYNAMIC_RANGE;
-  static float linear_blend = LINEAR_BLEND;
+  static uint8_t i = 0;
 
   if (wasHeld) {
     // For now, treat any button press as same action
@@ -189,6 +207,8 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
     LED_state = off_st;
     return;
   }
+
+#if TRY_NEW_LEVEL_VALUES == 0
 
   switch (buttonPress) {
     case 0:
@@ -217,13 +237,48 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 
     default:
       if (buttonPress == (BUTTON_LEFT | BUTTON_DOWN)) {
-        max_level = (max_level < 0.06) ? 0.65 : max_level - 0.05;
-        dynamic_range = (dynamic_range < 6) ? DYNAMIC_RANGE : dynamic_range - 5;
+        i = (i + 1) % MAX_LEVELS_PROFILE;
+        computeLevels(levelsArray[i].max_level,
+                      levelsArray[i].dynamic_range,
+                      levelsArray[i].linear_blend);
+      }
+      break;
+    }
+
+#else
+
+  switch (buttonPress) {
+    case 0:
+      break;
+
+    case BUTTON_RIGHT:
+      max_level = (max_level < 0.03) ? 0.90 : max_level - 0.02;
+      break;
+    case BUTTON_LEFT:
+      max_level = (max_level > 0.89) ? 0.02 : max_level + 0.02;
+      break;
+
+    case BUTTON_DOWN:
+      dynamic_range = (dynamic_range < 3) ? DYNAMIC_RANGE + 10 : dynamic_range - 2;
+      break;
+    case BUTTON_UP:
+      dynamic_range = (dynamic_range > DYNAMIC_RANGE + 10) ? 4 : dynamic_range + 2;
+      break;
+
+    default:
+      if (buttonPress == (BUTTON_LEFT | BUTTON_DOWN)) {
         linear_blend = (linear_blend < 0.11) ? 0.7 : linear_blend - 0.05;
-        computeLevels(max_level, dynamic_range, linear_blend);
+      }
+      else if (buttonPress == (BUTTON_LEFT | BUTTON_UP)) {
+        linear_blend = (linear_blend > 0.69) ? 0.10 : linear_blend + 0.05;
       }
       break;
   }
+        computeLevels(max_level, dynamic_range, linear_blend);
+
+#endif // TRY_NEW_LEVEL_VALUES == 0
+
+
 }
 
 
@@ -282,6 +337,7 @@ void computeLevels(float maxLevel, float dynamicRange, float linearBlend)
   uint8_t x, y;
   float n, logLevel, linearLevel;
 
+#if TRY_NEW_LEVEL_VALUES == 1
   Serial.print("maxLevel = ");
   Serial.println(maxLevel);
   Serial.print("dynamicRange = ");
@@ -289,6 +345,7 @@ void computeLevels(float maxLevel, float dynamicRange, float linearBlend)
   Serial.print("linearBlend = ");
   Serial.println(linearBlend);
   Serial.println("---------------------");
+#endif // TRY_NEW_LEVEL_VALUES == 1
 
 // Compute vertical values (for when LED_state is showing bars going up-down)
   for (y = 0; y < HEIGHT; y++) {
@@ -298,10 +355,10 @@ void computeLevels(float maxLevel, float dynamicRange, float linearBlend)
     linearLevel = linearLevel * linearBlend;
     logLevel = logLevel * (1.0 - linearBlend);
     thresholdVertical[HEIGHT - y - 1] = (logLevel + linearLevel) * maxLevel;
-    Serial.print(HEIGHT - y - 1);
-    Serial.print(": ");
-    Serial.print(thresholdVertical[HEIGHT - y - 1], 5);
-    Serial.print("\n");
+    //Serial.print(HEIGHT - y - 1);
+    //Serial.print(": ");
+    //Serial.print(thresholdVertical[HEIGHT - y - 1], 5);
+    //Serial.print("\n");
   }
   // Compute horizontal values (for when LED_state is showing bars going
   // side-to-side)
@@ -312,9 +369,9 @@ void computeLevels(float maxLevel, float dynamicRange, float linearBlend)
     linearLevel = linearLevel * linearBlend;
     logLevel = logLevel * (1.0 - linearBlend);
     thresholdHorizontal[WIDTH - x - 1] = (logLevel + linearLevel) * maxLevel;
-    Serial.print(WIDTH - x - 1);
-    Serial.print(": ");
-    Serial.print(thresholdHorizontal[WIDTH - x - 1], 5);
-    Serial.print("\n");
+    //Serial.print(WIDTH - x - 1);
+    //Serial.print(": ");
+    //Serial.print(thresholdHorizontal[WIDTH - x - 1], 5);
+    //Serial.print("\n");
   }
 }

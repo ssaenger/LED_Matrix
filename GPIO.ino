@@ -1,7 +1,11 @@
 #include "GPIO.h"
 
 // GPIO_debounce counter values
+#if TRY_NEW_LEVEL_VALUES == 1
+#define DEBOUNCE_MAX_VAL 2   // Low value to accom. time to do calc
+#else
 #define DEBOUNCE_MAX_VAL 0xABC   // Higher val = longer to register button press
+#endif // TRY_NEW_LEVEL_VALUES == 1
 #define HOLD_TIME_VAL    0x3ABCD // higher val = longer hold time to register
 
 enum deb_states { wait_st,
@@ -108,6 +112,7 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
         // Update button state
         *wasHeld = 1;
         deb_state = held_st;
+        Serial.println("held down button");
       }
       else if (!currButton_val) {
          // We've let go of the buttons
@@ -115,6 +120,7 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
         success = 1; // Indicate success in determining action to take
         *wasHeld = 0;
         deb_state = wrap_up_st;
+        Serial.println("button was released");
       }
       else {
         // Not needed here, since default value is 0, but indicate
