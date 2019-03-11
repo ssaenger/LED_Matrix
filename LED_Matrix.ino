@@ -3,8 +3,8 @@
  * Created by Shawn Saenger with adaption from other contributers
  */
 
-#include <OctoWS2811.h>
 #include <Audio.h>
+#include <OctoWS2811.h>
 #include <Wire.h>
 #include <SD.h>
 #include <SPI.h>
@@ -14,7 +14,7 @@
 
 // Normally the buttons are used to change the LED matrix state and colors
 // Setting this define to 1 will allow you to use the buttons to try out
-// new level values.
+// new level values (sensitivity of LEDs).
 #define TRY_NEW_LEVEL_VALUES 0
 
 //------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ AudioConnection          patchCord3(mixer1, fft);
 // OctoWS2811 definitions
 #define LEDS_PER_PIN   360    // My LED Matrix is divided up into 8 diff sectors
 
-// These values that are set apply only at startup
+// Some default levels
 #define MAX_LEVEL      0.30f  // 1.0 = max, lower is more "sensitive"
 #define DYNAMIC_RANGE  40.0f  // Smaller number = harder to overcome init thresh
 #define LINEAR_BLEND   0.5f   // useful range is 0 to 0.7
@@ -82,9 +82,8 @@ float thresholdVertical[HEIGHT];
 float thresholdHorizontal[WIDTH];
 
 // Spectrum arrays
-uint32_t* freqBins1;
-uint32_t* freqBins2;
-uint32_t* freqBins3;
+uint32_t* freqBinWidth;
+uint32_t* freqBinHeight;
 
 // Index of the fixedColors array
 uint32_t fixedOnColor;
@@ -119,7 +118,7 @@ uint8_t LED_statePrev;
 // Prototypes
 void GPIO_init();
 void GPIO_debounce();
-void Coor_plotLEDs(uint8_t LED_state);
+void Coor_plotLEDs(uint8_t LED_state, uint32_t* Bin4Width, uint32_t* Bin4Height);
 void Coor_mixedColors(uint8_t LED_state);
 void color_HSLtoRGB(uint32_t  saturation,
                     uint32_t  lightness,
@@ -170,10 +169,13 @@ void setup()
                 levelsArray[0].dynamic_range,
                 levelsArray[0].linear_blend);
 
-  freqBins1 = spectrum_getBin1();
-  freqBins2 = spectrum_getBin2();
-  freqBins3 = spectrum_getBin3();
+  freqBinWidth  = spectrum_getBin0();
+  freqBinHeight = spectrum_getBin3();
 
+  if (!(freqBinWidth && freqBinHeight)) {
+    Serial.println("one of the bins is too long");
+    exit(1);
+  }
   LED_state = fft_mid_st;
   LED_statePrev = fft_bot_st;
   leds.begin();
@@ -186,7 +188,7 @@ void loop()
   buttonVal_t buttonPress;
   uint8_t wasHeld = 0;
 
-  Coor_plotLEDs(LED_state); // Only returns once button is pressed
+  Coor_plotLEDs(LED_state, freqBinWidth, freqBinHeight); // Only returns once button is pressed
 
   // Debounce any buttons. This line of code will be run
   // once a button is pressed.
@@ -199,7 +201,7 @@ void loop()
 // the variable LED_state
 void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
 {
-  static uint8_t i = 0;
+  static uint8_t i, x = 0;
 
   if (wasHeld) {
     // For now, treat any button press as same action
@@ -241,6 +243,32 @@ void updateLedState(buttonVal_t buttonPress, uint8_t wasHeld)
         computeLevels(levelsArray[i].max_level,
                       levelsArray[i].dynamic_range,
                       levelsArray[i].linear_blend);
+      }
+      else if (buttonPress == (BUTTON_RIGHT | BUTTON_DOWN)) {
+        switch (x) {
+          case 0:
+            freqBinWidth = spectrum_getBin0();
+            x = 1;
+            break;
+
+          case 1:
+            freqBinWidth = spectrum_getBin1();
+            x = 2;
+            break;
+
+          case 2:
+            freqBinWidth = spectrum_getBin2();
+            x = 0;
+            break;
+
+          default:
+            x = 0;
+            break;
+        }
+        if (!freqBinWidth) {
+          // Oops, a freq bin is too long
+          exit(1);
+        }
       }
       break;
     }

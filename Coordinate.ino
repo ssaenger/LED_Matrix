@@ -37,7 +37,7 @@ void coorSweep();
 //------------------------------------------------------------------------------
 
 // The entire matrix has one color
-void Coor_plotLEDs(uint8_t LED_state) {
+void Coor_plotLEDs(uint8_t LED_state, uint32_t* Bin4Width, uint32_t* Bin4Height) {
   static uint32_t frameCount = 0;
   static uint32_t frameCountOff = 0;
   static float    level;
@@ -46,7 +46,6 @@ void Coor_plotLEDs(uint8_t LED_state) {
   static uint16_t  freqBin;
   static uint8_t  r, g, b;
   static uint8_t firstPass = 1;
-
 
   switch(LED_state) {
     case fft_bot_st:
@@ -57,7 +56,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
           for (x = 0; x < WIDTH; x++) {
 
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Width[x] - 1);
             for (y = 1; y < HEIGHT; y++) {
 
               if (level >= thresholdVertical[y]) {
@@ -72,7 +71,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
             //fix always on LEDs
             leds.setPixel(map_xy_bot(x, 0),
               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins2[x];
+            freqBin = freqBin + Bin4Width[x];
           }
         }
         leds.show();
@@ -86,7 +85,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
           freqBin = 0;
           for (x = 0; x < WIDTH; x++) {
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Width[x] - 1);
 
             for (y = 1; y < HEIGHT; y++) {
               if (level >= thresholdVertical[y]) {
@@ -100,7 +99,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
             //fix always on LEDs
             leds.setPixel(map_xy_top(x, 0),
               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins2[x];
+            freqBin = freqBin + Bin4Width[x];
           }
         }
         leds.show();
@@ -114,7 +113,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
           freqBin = 0;
           for (x = 0; x < WIDTH; x++) {
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Width[x] - 1);
             for (y = 1; y < HEIGHT / 2; y++) {
               if (level >= thresholdVertical[(y * 2) + 1]) {
                 leds.setPixel(map_xy_bot(x, y),
@@ -133,7 +132,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
             leds.setPixel(map_xy_top(x, 0),
               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins2[x];
+            freqBin = freqBin + Bin4Width[x];
           }
         }
         leds.show();
@@ -147,7 +146,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
           freqBin = 0;
           for (x = 0; x < WIDTH; x++) {
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Width[x] - 1);
             for (y = 1; y < HEIGHT / 2; y++) {
               if (level >= thresholdVertical[(y * 2) + 1]) {
                 leds.setPixel(map_xy_bot(x, y),
@@ -166,7 +165,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
             leds.setPixel(map_xy_top_F(x, 0),
               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins2[x];
+            freqBin = freqBin + Bin4Width[x];
           }
         }
         leds.show();
@@ -181,10 +180,10 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
 
           for (x = 0; x < WIDTH; x++) {
-            level = fft.read(freqBin, freqBin + freqBins2[x] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Width[x] - 1);
             for (y = 0; y < HEIGHT / 2 - 1; y++) {
               if (level >= thresholdVertical[(y * 2) + 1] +
-                             (freqBins2[x] * thresholdVertical[0])) {
+                             (Bin4Width[x] * thresholdVertical[0])) {
                 leds.setPixel(map_xy_midBot(x, y, HEIGHT / 2 + 1),
                               pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
                 leds.setPixel(map_xy_midTop(x, y, HEIGHT / 2 + 1),
@@ -202,7 +201,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
                           pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
             leds.setPixel(map_xy_midTop(x, 0, HEIGHT / 2),
                           pick_color(x * 4, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins2[x];
+            freqBin = freqBin + Bin4Width[x];
           }
           leds.show();
         }
@@ -221,7 +220,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
           freqBin = 0;
           for (y = 0; y < HEIGHT; y++) {
-            level = fft.read(freqBin, freqBin + freqBins3[y] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Height[y] - 1);
               for (x = 1; x < WIDTH / 2; x++) {
               if (level >= thresholdHorizontal[(x * 2) + 1]) {
                 leds.setPixel(map_xy_sidL(x, y),
@@ -240,7 +239,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
                           pick_color(y * 6, frameCount, fixedOnColor, isRainbow_onColor));
             leds.setPixel(map_xy_sidR(0, y),
                           pick_color(y * 6, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins3[y];
+            freqBin = freqBin + Bin4Height[y];
           }
         }
         leds.show();
@@ -258,7 +257,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
           frameCountOff = isDynamic_offColor ? frameCountOff + 1 : frameCountOff;
           freqBin = 0;
           for (y = 0; y < HEIGHT; y++) {
-            level = fft.read(freqBin, freqBin + freqBins3[y] - 1);
+            level = fft.read(freqBin, freqBin + Bin4Height[y] - 1);
               for (x = 1; x < WIDTH / 2; x++) {
               if (level >= thresholdHorizontal[(x * 2) + 1]) {
                 leds.setPixel(map_xy_sidL(x, y),
@@ -277,7 +276,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
                           pick_color(y * 6, frameCount, fixedOnColor, isRainbow_onColor));
             leds.setPixel(map_xy_sidR_F(0, y),
                           pick_color(y * 6, frameCount, fixedOnColor, isRainbow_onColor));
-            freqBin = freqBin + freqBins3[y];
+            freqBin = freqBin + Bin4Height[y];
           }
         }
         leds.show();
@@ -350,7 +349,7 @@ void Coor_plotLEDs(uint8_t LED_state) {
     default:
       break;
   }
-  if (LED_state != firstPass) {
+  if (LED_state != off_st) {
     firstPass = 1;
   }
 }

@@ -91,9 +91,6 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
                           (!digitalRead(M_F_PIN)  << 1) |
                           (!digitalRead(M_B_PIN));
         registeredButton_val = currButton_val; // We have found our button value
-        Serial.println("-----------buttonVal--------------");
-        Serial.println(currButton_val, HEX);
-        Serial.println("");
         deb_state = register_st;
       }
       break;
@@ -112,7 +109,6 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
         // Update button state
         *wasHeld = 1;
         deb_state = held_st;
-        Serial.println("held down button");
       }
       else if (!currButton_val) {
          // We've let go of the buttons
@@ -120,7 +116,6 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
         success = 1; // Indicate success in determining action to take
         *wasHeld = 0;
         deb_state = wrap_up_st;
-        Serial.println("button was released");
       }
       else {
         // Not needed here, since default value is 0, but indicate
@@ -151,7 +146,7 @@ buttonVal_t GPIO_debounce(uint8_t* wasHeld)
       }
       break;
   }
-  debugStatePrint();
+  //debugStatePrint();
 
   if (success) {
     return registeredButton_val;
