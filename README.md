@@ -1,5 +1,5 @@
 # LED_Matrix
-My personal project with a 47x60 LED matrix.
+My personal project with a 47x60 LED matrix. You can see it in action here: https://imgur.com/gallery/tSoa2W6
 
 My LED matrix is wired differently than the OctoWS2811 library expects.
 Because of this, I had to modify the library. While I was at it, I made
